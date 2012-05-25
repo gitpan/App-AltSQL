@@ -23,7 +23,7 @@ App::AltSQL - A drop in replacement to the MySQL prompt with a pluggable Perl in
 
 =head1 DESCRIPTION
 
-AltSQL is a way to improve your user experience with C<mysql>, C<sqlite3>, C<psql> and other tool that Perl has L<DBI> drivers for.  Currently written for MySQL only, the long term goal of this project is to provide users of the various SQL-based databases with a familiar command line interface but with modern improvements such as color, unicode box tables, and tweaks to the user interface that are fast and easy to prototype and experiment with.
+AltSQL is a way to improve your user experience with C<mysql>, C<sqlite3>, C<psql> and other tools that Perl has L<DBI> drivers for.  Currently written for MySQL only, the long term goal of this project is to provide users of the various SQL-based databases with a familiar command line interface but with modern improvements such as color, unicode box tables, and tweaks to the user interface that are fast and easy to prototype and experiment with.
 
 There are a few key issues that this programmer has had with using the mysql client every day.  After looking for alternatives and other ways to fix the problems, reimplementing the client in Perl seemed like the easiest approach, and lent towards the greatest possible adoption by my peers.  Here are a few of those issues:
 
@@ -96,6 +96,7 @@ Write your configuration file to either the system or the local configuration lo
   ---
   plugins:
     - Tail
+    - Dump
 
   view_plugins:
     - Color
@@ -129,7 +130,7 @@ use Data::Dumper;
 use Config::Any;
 use Hash::Union qw(union);
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 our $| = 1;
 
 # Don't emit 'Wide character in output' warnings
@@ -144,7 +145,7 @@ my %_default_classes = (
 	model => 'App::AltSQL::Model::MySQL',
 );
 my %default_config = (
-	plugins => [ 'Tail' ],
+	plugins => [ 'Tail', 'Dump' ],
 	view_plugins => [ 'Color', 'UnicodeBox' ],
 );
 
@@ -212,6 +213,11 @@ sub BUILD {
 				%args,
 			});
 		}
+	}
+
+	# Call setup on each subclass now that they're all created
+	foreach my $subclass (qw(term model)) {
+		$self->{$subclass}->setup();
 	}
 
 	$self->model->db_connect();
@@ -388,7 +394,7 @@ sub new_from_cli {
 	my $self = $class->new(args => $args, config => $config || \%default_config);
 
 	# Load in any plugins that are configured
-	foreach my $plugin (@{ $config->{plugins} }) {
+	foreach my $plugin (@{ $self->config->{plugins} }) {
 		$self->load_plugin($plugin);
 	}
 
@@ -504,7 +510,7 @@ sub create_view {
 	);
 
 	if (my $plugins = $self->config->{view_plugins}) {
-		$view->load_plugin($_) foreach @$plugins;
+		$view->load_plugins(@$plugins);
 	}
 
 	return $view;

@@ -3,7 +3,7 @@ package App::AltSQL::Term;
 use Moose;
 use Term::ReadLine::Zoid;
 use Data::Dumper;
-use JSON::XS;
+use JSON qw(encode_json decode_json);
 
 with 'App::AltSQL::Role';
 with 'MooseX::Object::Pluggable';
@@ -37,7 +37,7 @@ sub BUILD {
 sub _build_term {
 	my $self = shift;
 
-	my $term = Term::ReadLine::Zoid->new("mysql-client");
+	my $term = Term::ReadLine::Zoid->new("altsql-shell");
 	$self->{term} = $term;
 
 	$term->Attribs->{completion_function} = sub {
