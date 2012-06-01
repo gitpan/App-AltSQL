@@ -51,7 +51,7 @@
    "provides" : {
       "App::AltSQL" : {
          "file" : "lib/App/AltSQL.pm",
-         "version" : "0.04"
+         "version" : "0.05"
       },
       "App::AltSQL::Model" : {
          "file" : "lib/App/AltSQL/Model.pm",
@@ -113,6 +113,10 @@
          "file" : "lib/App/AltSQL/Term.pm",
          "version" : 0
       },
+      "App::AltSQL::Term::Plugin::SyntaxHighlight" : {
+         "file" : "lib/App/AltSQL/Term/Plugin/SyntaxHighlight.pm",
+         "version" : 0
+      },
       "App::AltSQL::View" : {
          "file" : "lib/App/AltSQL/View.pm",
          "version" : 0
@@ -124,12 +128,16 @@
       "App::AltSQL::View::Plugin::UnicodeBox" : {
          "file" : "lib/App/AltSQL/View/Plugin/UnicodeBox.pm",
          "version" : 0
+      },
+      "App::AltSQL::View::Plugin::VerticalSorted" : {
+         "file" : "lib/App/AltSQL/View/Plugin/VerticalSorted.pm",
+         "version" : 0
       }
    },
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "http://github.com/ewaters/altsql-shell/issues"
+         "web" : "http://github.com/ewaters/altsql-shell/issues?labels=bug"
       },
       "homepage" : "http://ewaters.github.com/altsql-shell",
       "license" : [
@@ -139,5 +147,5 @@
          "url" : "http://github.com/ewaters/altsql-shell"
       }
    },
-   "version" : "0.04"
+   "version" : "0.05"
 }

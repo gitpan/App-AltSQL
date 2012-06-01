@@ -29,6 +29,9 @@ README.pod
 INSTALL
 t/001_arguments.t
 t/002_my_cnf.t
+t/003_custom_prompt.t
 t/sql/sakila-data.sql
 t/sql/sakila-schema.sql
+lib/App/AltSQL/View/Plugin/VerticalSorted.pm
+lib/App/AltSQL/Term/Plugin/SyntaxHighlight.pm
 SIGNATURE    Added here by Module::Build

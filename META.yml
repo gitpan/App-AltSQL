@@ -19,7 +19,7 @@ name: App-AltSQL
 provides:
   App::AltSQL:
     file: lib/App/AltSQL.pm
-    version: 0.04
+    version: 0.05
   App::AltSQL::Model:
     file: lib/App/AltSQL/Model.pm
     version: 0
@@ -65,6 +65,9 @@ provides:
   App::AltSQL::Term:
     file: lib/App/AltSQL/Term.pm
     version: 0
+  App::AltSQL::Term::Plugin::SyntaxHighlight:
+    file: lib/App/AltSQL/Term/Plugin/SyntaxHighlight.pm
+    version: 0
   App::AltSQL::View:
     file: lib/App/AltSQL/View.pm
     version: 0
@@ -73,6 +76,9 @@ provides:
     version: 0
   App::AltSQL::View::Plugin::UnicodeBox:
     file: lib/App/AltSQL/View/Plugin/UnicodeBox.pm
+    version: 0
+  App::AltSQL::View::Plugin::VerticalSorted:
+    file: lib/App/AltSQL/View/Plugin/VerticalSorted.pm
     version: 0
 requires:
   Config::Any: 0
@@ -92,8 +98,8 @@ requires:
   Text::UnicodeBox: 0.03
   YAML: 0
 resources:
-  bugtracker: http://github.com/ewaters/altsql-shell/issues
+  bugtracker: http://github.com/ewaters/altsql-shell/issues?labels=bug
   homepage: http://ewaters.github.com/altsql-shell
   license: http://dev.perl.org/licenses/
   repository: http://github.com/ewaters/altsql-shell
-version: 0.04
+version: 0.05

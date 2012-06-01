@@ -1,5 +1,37 @@
 package App::AltSQL::Model::MySQL;
 
+=head1 NAME
+
+App::AltSQL::Model::MySQL
+
+=head1 DESCRIPTION
+
+This module is currently the only Model supported by L<App::AltSQL>.
+
+Upon startup, we will read in C<$HOME/.my.cnf> and will read and respect the following configuration variables:
+
+=over 4
+
+=item B<user>
+
+=item B<password>
+
+=item B<host>
+
+=item B<port>
+
+=item B<prompt>
+
+=item B<safe_update>
+
+=item B<select_limit>
+
+=tiem B<no_auto_rehash>
+
+=back
+
+=cut
+
 use Moose;
 use DBI;
 use Sys::SigAction qw(set_sig_handler);
@@ -55,11 +87,9 @@ sub setup {
 	my $self = shift;
 	$self->find_and_read_configs();
 
-	# If the user has configured a custom prompt in .my.cnf, use that in the Term instance
-	if ($self->prompt) {
-		my $role = Moose::Meta::Role->create_anon_role();
-		$role->add_method(prompt => sub { $self->render_prompt() });
-		$role->apply($self->app->term);
+	# If the user has configured a custom prompt in .my.cnf and not one in the config, use that in the Term instance
+	if ($self->prompt && ! $self->app->config->{prompt}) {
+		$self->app->term->prompt( $self->parse_prompt() );
 	}
 }
 
@@ -135,7 +165,7 @@ sub read_my_dot_cnf {
 			}
 
 			# override anything that was set on the commandline with the stuff read from the config.
-			unless ($self->{$key}) { $self->{$key} = $val };
+			unless (defined $self->{$key}) { $self->{$key} = $val };
 		}
 	}
 
@@ -170,26 +200,24 @@ sub update_autocomplete_entries {
 	my ($self, $database) = @_;
 
 	return if $self->no_auto_rehash;
-	$self->log_debug("Reading table information for completion of table and column names\nYou can turn off this feature to get a quicker startup with -A\n");
+	my $cache_key = 'autocomplete_' . $database;
+	if (! $self->{_cache}{$cache_key}) {
+		$self->log_debug("Reading table information for completion of table and column names\nYou can turn off this feature to get a quicker startup with -A\n");
 
-	my %autocomplete;
-	my $rows = $self->dbh->selectall_arrayref("select TABLE_NAME, COLUMN_NAME from information_schema.COLUMNS where TABLE_SCHEMA = ?", {}, $database);
-	foreach my $row (@$rows) {
-		$autocomplete{$row->[0]} = 1; # Table
-		$autocomplete{$row->[1]} = 1; # Column
-		$autocomplete{$row->[0] . '.' . $row->[1]} = 1; # Table.Column
+		my %autocomplete;
+		my $rows = $self->dbh->selectall_arrayref("select TABLE_NAME, COLUMN_NAME from information_schema.COLUMNS where TABLE_SCHEMA = ?", {}, $database);
+		foreach my $row (@$rows) {
+			$autocomplete{$row->[0]} = 1; # Table
+			$autocomplete{$row->[1]} = 1; # Column
+			$autocomplete{$row->[0] . '.' . $row->[1]} = 1; # Table.Column
+		}
+		$self->{_cache}{$cache_key} = \%autocomplete;
 	}
-	$self->app->term->autocomplete_entries(\%autocomplete);
+	$self->app->term->autocomplete_entries( $self->{_cache}{$cache_key} );
 }
 
 sub handle_sql_input {
 	my ($self, $input, $render_opts) = @_;
-
-	# Track which database we're in for autocomplete
-	if (my ($database) = $input =~ /^use \s+ (\S+)$/ix) {
-		$self->current_database($database);
-		$self->update_autocomplete_entries($database);
-	}
 
 	# Figure out the verb of the SQL by either using regex or a parser.  If we
 	# use the parser, we get error checking here instead of the server.
@@ -220,6 +248,12 @@ sub handle_sql_input {
 
 	my $sth = $self->execute_sql($input);
 	return unless $sth; # error may have been reached (and reported)
+
+	# Track which database we're in for autocomplete
+	if (my ($database) = $input =~ /^use \s+ (\S+)$/ix) {
+		$self->current_database($database);
+		$self->update_autocomplete_entries($database);
+	}
 
 	my %timing = ( prepare_execute => gettimeofday - $t0 );
 
@@ -311,76 +345,66 @@ my %prompt_substitutions = (
 	t    => "\t",
 	'_'  => ' ',
 	' '  => ' ',
-	d    => sub { shift->{self}->current_database },
-	h    => sub { shift->{self}->host },
-	c    => sub { ++( shift->{self}{_statement_counter} ) },
-	u    => sub { shift->{self}->user },
-	U    => 'TODO-username@hostname',
-);
-my %date_prompt_substitutions = (
-	D    => sub { shift->{date}->strftime('%a, %d %b %H:%M:%S %Y') },
-	w    => sub { shift->{date}->day_abbr },
-	y    => sub { shift->{date}->stftime('%y') },
-	Y    => sub { shift->{date}->stftime('%Y') },
-	o    => sub { shift->{date}->month },
-	O    => sub { shift->{date}->mont_abbr },
-	R    => sub { shift->{date}->hour },
-	r    => sub { shift->{date}->strftime('%I') },
-	m    => sub { shift->{date}->strftime('%M') },
-	s    => sub { shift->{date}->strftime('%S') },
-	P    => sub { shift->{date}->strftime('%p') },
+	d    => '%d',
+	h    => '%h',
+	c    => '%e{ ++( shift->{self}{_statement_counter} ) }',
+	u    => '%u',
+	U    => '%u@%h',
+	D    => '%t{%a, %d %b %H:%M:%S %Y}',
+	w    => '%t{%a}', 
+	y    => '%t{%y}',
+	Y    => '%t{%Y}',
+	o    => '%t{%m}',
+	O    => '%t{%b}',
+	R    => '%t{%k}',
+	r    => '%t{%I}',
+	m    => '%t{%M}',
+	s    => '%t{%S}',
+	P    => '%t{%p}',
 );
 
-sub render_prompt {
-	my ($self, $now) = @_;
+=cut
 
-	if (! defined $self->{_has_datetime}) {
-		eval { require DateTime; };
-		$self->{_has_datetime} = $@ ? 0 : 1;
-	}
+Take a .my.cnf prompt format and convert it into Term escape options
 
-	if (! $now && $self->{_has_datetime}) {
-		$now = DateTime->now( time_zone => 'local' );
-	}
+Reference:
+http://www.thegeekstuff.com/2010/02/mysql_ps1-6-examples-to-make-your-mysql-prompt-like-angelina-jolie/
 
-	my %context = (
-		self => $self,
-		date => $now,
-	);
+=cut
 
-	my $warn_datetime = 0;
+sub parse_prompt {
+	my $self = shift;
+
 	my $parsed_prompt = $self->prompt;
 	$parsed_prompt =~ s{\\\\(.)}{
-		my $substitute = $prompt_substitutions{$1} || $date_prompt_substitutions{$1};
+		my $substitute = $prompt_substitutions{$1};
 		if (! $substitute) {
 			"$1";
 		}
 		elsif (ref $substitute) {
-			if ($date_prompt_substitutions{$1} && ! $now) {
-				$warn_datetime++;
-				'?';
-			}
-			else {
-				$substitute->(\%context);
-			}
+			$substitute->($self);
 		}
 		else {
 			$substitute;
 		}
 	}exg;
 
-	if ($warn_datetime && ! $self->{_warned_datetime}) {
-		$self->log_error("Prompt uses date variables; install DateTime to render them");
-		$self->{_warned_datetime}++;
-	}
-	
-	# Prelimary code: support color prompts like '\[\033[00;31m\]'
-	$parsed_prompt =~ s{\\\[ \\033 (.+?) \\\]}{\033$1}xg;
-	
 	return $parsed_prompt;
 }
 
 no Moose;
 __PACKAGE__->meta->make_immutable;
+
+=head1 COPYRIGHT
+
+Copyright (c) 2012 Eric Waters and Shutterstock Images (http://shutterstock.com).  All rights reserved.  This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+The full text of the license can be found in the LICENSE file included with this module.
+
+=head1 AUTHOR
+
+Eric Waters <ewaters@gmail.com>
+
+=cut
 
 1;

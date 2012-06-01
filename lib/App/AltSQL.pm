@@ -94,6 +94,8 @@ Write your configuration file to either the system or the local configuration lo
 =back
 
   ---
+  prompt: 'altsql> '
+
   plugins:
     - Tail
     - Dump
@@ -117,6 +119,59 @@ Write your configuration file to either the system or the local configuration lo
   
 This is the default configuration, and currently encompasses all the configurable settings.  This should be future safe; as you can see, plugins may use this file for their own variables as there are namespaced sections.
 
+=over 4
+
+=item B<prompt>
+
+  prompt: "%u@%h[%d]> "
+  # 'username@hostname[database]> '
+  prompt: "%c{red}%u%c{reset} %t{%F %T}> '
+  # 'username' (in red) ' YYYY-MM-DD HH:MM:SS> '
+
+Provide a custom prompt.  The following variables will be interpolated:
+
+=over 4
+
+=item B<%u>
+
+The username used to connect to the model
+
+=item B<%d>
+
+The current database or '(none)'
+
+=item B<%h>
+
+The hostname the model is connected to
+
+=item B<%%>
+
+An escaped percent sign
+
+=item B<%c{...}>
+
+A L<Term::ANSIColor> color name.  The value will be passed directly to the C<color> method.
+
+=item B<%e{...}>
+
+A block to be eval'ed.  You may use $self to refer to the L<App::AltSQL::Term> object
+
+=item B<%t{...}>
+
+The argument to this option will be passed to L<DateTime> C<strftime> for the current time
+
+=back
+
+=item B<plugins>
+
+An array of plugin names for the main namespace.
+
+=item B<view_plugins>
+
+An array of View plugin names to be applied to each View object created
+
+=back
+
 =head1 EXTENDING
 
 As mentioned above, one key point of this project is to make it easy for people to extend.  For this reason, I've built it on L<Moose> and offer a L<MooseX::Object::Pluggable> interface.  If you extend C<App::AltSQL>, you may want to know about the following methods.
@@ -130,7 +185,7 @@ use Data::Dumper;
 use Config::Any;
 use Hash::Union qw(union);
 
-our $VERSION = 0.04;
+our $VERSION = 0.05;
 our $| = 1;
 
 # Don't emit 'Wide character in output' warnings
@@ -147,6 +202,7 @@ my %_default_classes = (
 my %default_config = (
 	plugins => [ 'Tail', 'Dump' ],
 	view_plugins => [ 'Color', 'UnicodeBox' ],
+	term_plugins => [],
 );
 
 =head2 Accessors
@@ -394,8 +450,15 @@ sub new_from_cli {
 	my $self = $class->new(args => $args, config => $config || \%default_config);
 
 	# Load in any plugins that are configured
-	foreach my $plugin (@{ $self->config->{plugins} }) {
-		$self->load_plugin($plugin);
+	if ($self->config->{plugins}) {
+		foreach my $plugin (@{ $self->config->{plugins} }) {
+			$self->load_plugin($plugin);
+		}
+	}
+	if ($self->config->{term_plugins}) {
+		foreach my $plugin (@{ $self->config->{term_plugins} }) {
+			$self->term->load_plugin($plugin);
+		}
 	}
 
 	return $self;

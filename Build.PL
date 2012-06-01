@@ -42,7 +42,7 @@ my $build = Module::Build->new(
 		resources => {
 			repository => "http://github.com/ewaters/altsql-shell",
 			homepage => "http://ewaters.github.com/altsql-shell",
-			bugtracker => "http://github.com/ewaters/altsql-shell/issues",
+			bugtracker => "http://github.com/ewaters/altsql-shell/issues?labels=bug",
 		},
 	},
 );
